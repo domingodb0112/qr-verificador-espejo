@@ -1,91 +1,93 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Verificador QR - Obra de Teatro</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <title>Verificador QR - Espejos</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body {
       background-color: black;
       color: white;
       font-family: sans-serif;
       text-align: center;
-      padding: 20px;
-    }
-    h1 {
-      font-size: 28px;
+      padding: 2rem;
     }
     #reader {
       width: 300px;
-      margin: 20px auto;
+      margin: auto;
     }
     #resultado {
-      margin-top: 20px;
-      font-size: 20px;
+      margin-top: 1rem;
+      font-size: 1.2rem;
+      padding: 1rem;
+      border-radius: 8px;
     }
-    #reiniciar {
-      display: none;
-      margin-top: 20px;
-      padding: 10px 20px;
-      font-size: 18px;
+    .valido {
+      background-color: #0f0;
+      color: #000;
+    }
+    .invalido {
+      background-color: #f00;
+      color: #fff;
     }
   </style>
 </head>
 <body>
   <h1>Verificador QR - Obra de Teatro</h1>
   <div id="reader"></div>
-  <p id="resultado">Cargando base de datos...</p>
-  <button id="reiniciar">Escanear otro código</button>
+  <div id="resultado">Esperando escaneo...</div>
 
   <script>
-    const urlDatos = "https://opensheet.elk.sh/11IZ-7HA0O8349G9pjQUlctzMt9a4QX1I7G2yyEMZx9g/Espejos";
-    let registros = [];
+    const hojaID = "11IZ-7HA0O8349G9pjQUlctzMt9a4QX1I7G2yyEMZx9g";
+    const url = `https://opensheet.elk.sh/${hojaID}/Hoja1`;
 
-    function cargarDatos() {
-      return fetch(urlDatos)
-        .then(res => res.json())
-        .then(data => {
-          registros = data;
-          document.getElementById("resultado").innerText = "Listo para escanear";
-        })
-        .catch(() => {
-          document.getElementById("resultado").innerText = "⚠️ Error cargando la base de datos.";
-        });
+    let idsValidos = [];
+
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        idsValidos = data.map(row => row.id_base64);
+      })
+      .catch(err => {
+        console.error("Error cargando datos: ", err);
+        document.getElementById("resultado").textContent = "Error cargando datos de la hoja.";
+      });
+
+    function mostrarResultado(mensaje, valido) {
+      const res = document.getElementById("resultado");
+      res.textContent = mensaje;
+      res.className = valido ? "valido" : "invalido";
     }
 
-    function iniciarEscaneo() {
-      document.getElementById("resultado").innerText = "";
-      document.getElementById("reiniciar").style.display = "none";
-      const html5QrCode = new Html5Qrcode("reader");
-
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        qrCodeMessage => {
-          html5QrCode.stop();
-          verificarQR(qrCodeMessage.trim());
-        },
-        errorMessage => {}
-      );
-    }
-
-    function verificarQR(qrContenido) {
-      const persona = registros.find(r => r.id_base64.trim() === qrContenido);
-      const resultado = document.getElementById("resultado");
-
-      if (persona) {
-        resultado.innerText = `✅ Acceso concedido a: ${persona.nombre} ${persona.apellido} (ID: ${persona.id_normal})`;
+    function verificarCodigo(qrCodeMessage) {
+      if (idsValidos.includes(qrCodeMessage)) {
+        mostrarResultado("✅ Código válido: " + qrCodeMessage, true);
       } else {
-        resultado.innerText = "❌ Código no válido o no encontrado.";
+        mostrarResultado("❌ Código NO válido: " + qrCodeMessage, false);
       }
-
-      document.getElementById("reiniciar").style.display = "inline-block";
     }
 
-    document.getElementById("reiniciar").onclick = iniciarEscaneo;
+    const html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: 250 };
 
-    cargarDatos().then(iniciarEscaneo);
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        let cameraId = devices[0].id;
+        html5QrCode.start(
+          cameraId,
+          config,
+          qrCodeMessage => {
+            html5QrCode.stop();
+            verificarCodigo(qrCodeMessage);
+          },
+          error => {
+            // Puedes manejar errores aquí si lo deseas
+          }
+        );
+      }
+    }).catch(err => {
+      document.getElementById("resultado").textContent = "Error accediendo a la cámara.";
+    });
   </script>
 </body>
 </html>
