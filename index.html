@@ -2,91 +2,97 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Verificador QR - Espejos</title>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <title>MODULAR XTASIS - Verificador QR</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
-      background-color: black;
-      color: white;
       font-family: sans-serif;
+      background: #000;
+      color: #fff;
       text-align: center;
-      padding: 2rem;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 20px;
     }
     #reader {
       width: 300px;
       margin: auto;
     }
     #resultado {
-      margin-top: 1rem;
-      font-size: 1.2rem;
-      padding: 1rem;
-      border-radius: 8px;
+      margin-top: 20px;
+      font-size: 18px;
     }
-    .valido {
-      background-color: #0f0;
-      color: #000;
-    }
-    .invalido {
-      background-color: #f00;
-      color: #fff;
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <h1>Verificador QR - Obra de Teatro</h1>
+  <h1>MODULAR XTASIS - Verificador QR</h1>
   <div id="reader"></div>
-  <div id="resultado">Esperando escaneo...</div>
+  <p id="resultado"></p>
+  <button id="reiniciar" style="display: none;">Verificar otra entrada</button>
 
   <script>
-    const hojaID = "11IZ-7HA0O8349G9pjQUlctzMt9a4QX1I7G2yyEMZx9g";
-    const url = `https://opensheet.elk.sh/${hojaID}/Hoja1`;
+    const urlDatos = "https://opensheet.elk.sh/11IZ-7HA0O8349G9pjQUlctzMt9a4QX1I7G2yyEMZx9g/Hoja%201";
+    let datosValidos = [];
 
-    let idsValidos = [];
-
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        idsValidos = data.map(row => row.id_base64);
-      })
-      .catch(err => {
-        console.error("Error cargando datos: ", err);
-        document.getElementById("resultado").textContent = "Error cargando datos de la hoja.";
-      });
-
-    function mostrarResultado(mensaje, valido) {
-      const res = document.getElementById("resultado");
-      res.textContent = mensaje;
-      res.className = valido ? "valido" : "invalido";
+    async function cargarDatos() {
+      try {
+        const response = await fetch(urlDatos);
+        datosValidos = await response.json();
+      } catch (error) {
+        document.getElementById("resultado").innerText = "⚠️ Error al cargar la base de datos.";
+      }
     }
 
-    function verificarCodigo(qrCodeMessage) {
-      if (idsValidos.includes(qrCodeMessage)) {
-        mostrarResultado("✅ Código válido: " + qrCodeMessage, true);
+    function iniciarScanner() {
+      document.getElementById("resultado").innerText = "";
+      document.getElementById("reiniciar").style.display = "none";
+
+      const html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        qrCodeMessage => {
+          html5QrCode.stop();
+          verificarCodigo(qrCodeMessage.trim());
+        },
+        error => { /* Ignoramos errores de escaneo momentáneos */ }
+      );
+    }
+
+    function verificarCodigo(contenidoQR) {
+      const resultado = document.getElementById("resultado");
+      const boton = document.getElementById("reiniciar");
+
+      const coincidencia = datosValidos.find(item => item.id_base64.trim() === contenidoQR);
+
+      if (coincidencia) {
+        resultado.innerHTML = `
+          ✅ <strong>Acceso concedido</strong><br>
+          Nombre: ${coincidencia.nombre} ${coincidencia.apellido}<br>
+          ID: ${coincidencia.id_normal}
+        `;
       } else {
-        mostrarResultado("❌ Código NO válido: " + qrCodeMessage, false);
+        resultado.innerHTML = `
+          ❌ <strong>Código no encontrado</strong><br>
+          Intenta escanear nuevamente.
+        `;
       }
+
+      boton.style.display = "inline-block";
     }
 
-    const html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: 250 };
+    document.getElementById("reiniciar").onclick = iniciarScanner;
 
-    Html5Qrcode.getCameras().then(devices => {
-      if (devices && devices.length) {
-        let cameraId = devices[0].id;
-        html5QrCode.start(
-          cameraId,
-          config,
-          qrCodeMessage => {
-            html5QrCode.stop();
-            verificarCodigo(qrCodeMessage);
-          },
-          error => {
-            // Puedes manejar errores aquí si lo deseas
-          }
-        );
-      }
-    }).catch(err => {
-      document.getElementById("resultado").textContent = "Error accediendo a la cámara.";
+    // Iniciar todo
+    cargarDatos().then(() => {
+      iniciarScanner();
     });
   </script>
 </body>
