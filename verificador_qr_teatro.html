@@ -1,0 +1,91 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Verificador QR - Obra de Teatro</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 28px;
+    }
+    #reader {
+      width: 300px;
+      margin: 20px auto;
+    }
+    #resultado {
+      margin-top: 20px;
+      font-size: 20px;
+    }
+    #reiniciar {
+      display: none;
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Verificador QR - Obra de Teatro</h1>
+  <div id="reader"></div>
+  <p id="resultado">Cargando base de datos...</p>
+  <button id="reiniciar">Escanear otro código</button>
+
+  <script>
+    const urlDatos = "https://opensheet.elk.sh/11IZ-7HA0O8349G9pjQUlctzMt9a4QX1I7G2yyEMZx9g/Espejos";
+    let registros = [];
+
+    function cargarDatos() {
+      return fetch(urlDatos)
+        .then(res => res.json())
+        .then(data => {
+          registros = data;
+          document.getElementById("resultado").innerText = "Listo para escanear";
+        })
+        .catch(() => {
+          document.getElementById("resultado").innerText = "⚠️ Error cargando la base de datos.";
+        });
+    }
+
+    function iniciarEscaneo() {
+      document.getElementById("resultado").innerText = "";
+      document.getElementById("reiniciar").style.display = "none";
+      const html5QrCode = new Html5Qrcode("reader");
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        qrCodeMessage => {
+          html5QrCode.stop();
+          verificarQR(qrCodeMessage.trim());
+        },
+        errorMessage => {}
+      );
+    }
+
+    function verificarQR(qrContenido) {
+      const persona = registros.find(r => r.id_base64.trim() === qrContenido);
+      const resultado = document.getElementById("resultado");
+
+      if (persona) {
+        resultado.innerText = `✅ Acceso concedido a: ${persona.nombre} ${persona.apellido} (ID: ${persona.id_normal})`;
+      } else {
+        resultado.innerText = "❌ Código no válido o no encontrado.";
+      }
+
+      document.getElementById("reiniciar").style.display = "inline-block";
+    }
+
+    document.getElementById("reiniciar").onclick = iniciarEscaneo;
+
+    cargarDatos().then(iniciarEscaneo);
+  </script>
+</body>
+</html>
